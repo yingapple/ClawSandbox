@@ -19,7 +19,7 @@ OpenClaw is a self-hosted personal AI assistant that connects to 20+ messaging p
 ## What ClawSandbox Does
 
 - **One-command fleet deployment** — give it a number, get that many isolated OpenClaw instances
-- **Full desktop per instance** — each lobster runs in its own Docker container with an XFCE desktop, accessible from any browser via noVNC
+- **Full desktop per instance** — each claw runs in its own Docker container with an XFCE desktop, accessible from any browser via noVNC
 - **Lifecycle management** — create, start, stop, and destroy instances with simple CLI commands
 - **Data persistence** — each instance's data survives container restarts
 - **Resource isolation** — instances are isolated from your host system and from each other
@@ -60,13 +60,13 @@ clawsandbox create 3
 clawsandbox list
 ```
 
-### 4. Set up each lobster
+### 4. Set up each claw
 
-Each lobster needs a one-time configuration via its desktop:
+Each claw needs a one-time configuration via its desktop:
 
 ```bash
-# Open lobster-1's desktop in your browser (noVNC)
-clawsandbox desktop lobster-1
+# Open claw-1's desktop in your browser (noVNC)
+clawsandbox desktop claw-1
 ```
 
 Inside the desktop terminal:
@@ -85,7 +85,7 @@ Once the Gateway is running, open **Chromium** on the desktop and navigate to th
 
 ```bash
 clawsandbox build                       # Build the Docker image
-clawsandbox create <N>                  # Create N lobster instances
+clawsandbox create <N>                  # Create N claw instances
 clawsandbox list                        # List all instances and their status
 clawsandbox desktop <name>              # Open an instance's desktop in the browser
 clawsandbox start <name|all>            # Start a stopped instance

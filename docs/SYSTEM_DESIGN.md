@@ -1,17 +1,21 @@
-# ClawSandbox System Design Document
+# ClawSandbox System Design
 
-> 版本: v0.1 (Draft)
-> 日期: 2026-03-07
+> Version: v0.1 (Draft)
+> Date: 2026-03-07
 
-## 1. 概述
+[中文文档](./SYSTEM_DESIGN.zh-CN.md)
 
-ClawSandbox 是一个 CLI 工具，在单台宿主机上批量创建和管理多个隔离的 OpenClaw 实例。每个实例运行在独立的 Docker 容器中，拥有完整的 Linux 桌面环境，用户可通过浏览器访问桌面、通过 Telegram 与各实例独立对话。
+---
 
-## 2. 系统架构
+## 1. Overview
+
+ClawSandbox is a CLI tool that creates and manages multiple isolated OpenClaw instances on a single host machine. Each instance runs in its own Docker container with a full Linux desktop environment, accessible from any browser via noVNC. Users interact with each instance independently through Telegram.
+
+## 2. System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      宿主机 (macOS / Linux)                  │
+│                    Host Machine (macOS / Linux)              │
 │                                                             │
 │  ┌───────────────────────────────────┐                      │
 │  │        ClawSandbox CLI (Go)       │                      │
@@ -38,7 +42,7 @@ ClawSandbox 是一个 CLI 工具，在单台宿主机上批量创建和管理多
 │    │                │                        │              │
 │    ▼                ▼                        ▼              │
 │  ┌──────────┐  ┌──────────┐           ┌──────────┐         │
-│  │lobster-1 │  │lobster-2 │    ...    │lobster-N │         │
+│  │claw-1 │  │claw-2 │    ...    │claw-N │         │
 │  │          │  │          │           │          │         │
 │  │ XFCE     │  │ XFCE     │           │ XFCE     │         │
 │  │ noVNC    │  │ noVNC    │           │ noVNC    │         │
@@ -51,142 +55,136 @@ ClawSandbox 是一个 CLI 工具，在单台宿主机上批量创建和管理多
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 3. 组件详细设计
+## 3. Component Design
 
 ### 3.1 ClawSandbox CLI
 
-**技术栈：**
-- 语言：Go 1.22+
-- CLI 框架：[cobra](https://github.com/spf13/cobra)
-- Docker 交互：[Docker Engine SDK for Go](https://pkg.go.dev/github.com/docker/docker/client)
-- 编译产物：单个静态链接二进制文件（darwin/arm64, darwin/amd64, linux/amd64, linux/arm64）
+**Stack:**
+- Language: Go 1.25+
+- CLI framework: [cobra](https://github.com/spf13/cobra)
+- Docker integration: [go-dockerclient](https://github.com/fsouza/go-dockerclient)
+- Artifact: single statically-linked binary (darwin/arm64, darwin/amd64, linux/amd64, linux/arm64)
 
-**命令设计：**
+**Commands:**
 
 ```
-clawsandbox create <N>          # 创建 N 个龙虾实例
-clawsandbox list                # 列出所有实例及状态
-clawsandbox start <name|all>    # 启动实例
-clawsandbox stop <name|all>     # 停止实例
-clawsandbox destroy <name|all>  # 销毁实例（容器+数据）
-clawsandbox desktop <name>      # 在浏览器中打开该实例的 noVNC 桌面
-clawsandbox logs <name>         # 查看实例日志
-clawsandbox status              # 显示军团概览（实例数、资源占用等）
+clawsandbox build                       # Build the Docker image
+clawsandbox create <N>                  # Create N claw instances
+clawsandbox list                        # List all instances and their status
+clawsandbox start <name|all>            # Start a stopped instance
+clawsandbox stop <name|all>             # Stop a running instance
+clawsandbox destroy <name|all>          # Destroy instance (data kept by default)
+clawsandbox destroy --purge <name|all>  # Destroy instance and delete its data
+clawsandbox desktop <name>              # Open an instance's desktop in the browser
+clawsandbox logs <name> [-f]            # View instance logs
 ```
 
-**配置文件：** `~/.clawsandbox/config.yaml`
+**Config file:** `~/.clawsandbox/config.yaml`
 
 ```yaml
-# 基础镜像配置
 image:
   name: "clawsandbox/openclaw"
   tag: "latest"
 
-# 端口范围
 ports:
-  novnc_start: 6901      # noVNC 起始端口，递增分配
-  gateway_start: 18789   # Gateway 起始端口，递增分配
+  novnc_start: 6901      # noVNC base port, allocated sequentially
+  gateway_start: 18789   # Gateway base port, allocated sequentially
 
-# 容器资源限制
 resources:
-  memory_limit: "4g"     # 每个容器内存上限
-  cpu_limit: "2.0"       # 每个容器 CPU 上限（核数）
+  memory_limit: "4g"     # Per-container memory cap
+  cpu_limit: "2.0"       # Per-container CPU cap (cores)
 
-# 实例命名前缀
 naming:
-  prefix: "lobster"      # 实例名: lobster-1, lobster-2, ...
+  prefix: "claw"      # Instance names: claw-1, claw-2, ...
 ```
 
-### 3.2 Docker 镜像 (clawsandbox/openclaw)
+### 3.2 Docker Image (clawsandbox/openclaw)
 
-**基础镜像选择：** `node:22-bookworm`（与 OpenClaw 官方 Docker 方案一致）
+**Base image:** `node:22-bookworm` — consistent with OpenClaw's official Docker setup.
 
-**镜像分层设计：**
+**Layer design:**
 
 ```dockerfile
-# Layer 1: 基础系统 + 桌面环境
+# Layer 1: System packages + desktop environment
 FROM node:22-bookworm
 
-# 系统依赖 + XFCE 桌面 + VNC/noVNC
 RUN apt-get update && apt-get install -y \
     xfce4 xfce4-terminal \
     tigervnc-standalone-server \
     novnc websockify \
     dbus-x11 \
-    # Chromium 及 Playwright 依赖
     chromium \
     fonts-noto-cjk \
-    # 工具
     supervisor curl wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer 2: OpenClaw 安装
+# Wrap Chromium with --no-sandbox (required inside containers)
+RUN mv /usr/bin/chromium /usr/bin/chromium-real \
+    && printf '#!/bin/sh\nexec /usr/bin/chromium-real --no-sandbox "$@"\n' > /usr/bin/chromium \
+    && chmod +x /usr/bin/chromium
+
+# Layer 2: OpenClaw
 RUN npm install -g openclaw@latest
 
-# Layer 3: Playwright Chromium（构建时安装，避免运行时下载）
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright
-RUN npx playwright install chromium
+# Layer 3: Playwright Chromium (installed at build time to avoid runtime downloads)
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN node /usr/local/lib/node_modules/openclaw/node_modules/playwright-core/cli.js install chromium
 
-# Layer 4: 启动配置
-COPY supervisord.conf /etc/supervisor/conf.d/
+# Layer 4: Startup configuration
+COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 
-USER node
 EXPOSE 6901 18789
-
 ENTRYPOINT ["/entrypoint.sh"]
 ```
 
-**进程管理 (supervisord)：**
+**Process management (supervisord):**
 
-容器内需要同时运行多个进程，使用 supervisord 统一管理：
+| Process | Role | Port |
+|---------|------|------|
+| Xvnc | Virtual framebuffer + VNC server | DISPLAY :1 / 5901 (container-internal) |
+| XFCE4 | Desktop environment | — |
+| noVNC + websockify | VNC → WebSocket proxy | 6901 (host-mapped) |
+| OpenClaw Gateway | Core AI service (manual start) | 18789 (host-mapped) |
 
-| 进程 | 作用 | 端口 |
-|------|------|------|
-| Xvfb | 虚拟帧缓冲（虚拟显示器） | DISPLAY :1 |
-| XFCE4 | 桌面环境 | — |
-| VNC Server | VNC 协议服务 | 5901 (容器内) |
-| noVNC + websockify | VNC → WebSocket 代理 | 6901 (映射到宿主) |
-| OpenClaw Gateway | OpenClaw 核心服务 | 18789 (映射到宿主) |
+**entrypoint.sh responsibilities:**
+1. Initialize VNC password (from env var or use default)
+2. Create `.vnc` and `.openclaw` directories, set ownership to `node`
+3. Start supervisord
 
-**entrypoint.sh 职责：**
-1. 初始化 VNC 密码（可由环境变量注入或使用默认值）
-2. 如果 `~/.openclaw` 不存在，执行首次初始化
-3. 启动 supervisord
+**Estimated image size:**
+- Base system + XFCE + VNC/noVNC: ~800 MB
+- Node.js 22 + OpenClaw: ~300 MB
+- Playwright Chromium: ~300 MB
+- **Total: ~1.4 GB**
 
-**预估镜像大小：**
-- 基础系统 + XFCE + VNC/noVNC: ~800MB
-- Node.js 22 + OpenClaw: ~300MB
-- Chromium (Playwright): ~300MB
-- **总计: ~1.4GB**
+### 3.3 Port Allocation
 
-### 3.3 端口分配策略
-
-CLI 维护一个简单的端口分配器，避免冲突：
+The CLI maintains a port allocator to avoid conflicts:
 
 ```
-实例       noVNC 端口     Gateway 端口
-lobster-1  6901          18789
-lobster-2  6902          18790
-lobster-3  6903          18791
+Instance   noVNC port   Gateway port
+claw-1  6901         18789
+claw-2  6902         18790
+claw-3  6903         18791
 ...
-lobster-N  6900+N        18788+N
+claw-N  6900+N       18788+N
 ```
 
-分配逻辑：
-- 从配置的起始端口开始递增
-- 创建前检测端口是否被占用（`net.Listen` 探测）
-- 分配结果记录在状态文件中
+Allocation logic:
+- Start from the configured base port, increment until a free port is found
+- Probe availability via `net.Listen` before allocation
+- Allocated ports are recorded in the state file
 
-### 3.4 状态管理
+### 3.4 State Management
 
-**状态文件：** `~/.clawsandbox/state.json`
+**State file:** `~/.clawsandbox/state.json`
 
 ```json
 {
   "instances": [
     {
-      "name": "lobster-1",
+      "name": "claw-1",
       "container_id": "abc123...",
       "status": "running",
       "ports": {
@@ -199,129 +197,121 @@ lobster-N  6900+N        18788+N
 }
 ```
 
-状态文件是 CLI 的元数据缓存，真实状态以 Docker 容器状态为准。CLI 每次操作时与 Docker API 对账，修正不一致。
+The state file is a metadata cache. Docker is the source of truth — the CLI reconciles against the Docker API on every operation.
 
-### 3.5 数据卷设计
+### 3.5 Data Volumes
 
-每个容器挂载独立的宿主目录，实现数据持久化和隔离：
+Each container gets its own bind-mounted host directory for persistence and isolation:
 
 ```
 ~/.clawsandbox/data/
-├── lobster-1/
-│   └── openclaw/     → 容器内 /home/node/.openclaw
-├── lobster-2/
-│   └── openclaw/     → 容器内 /home/node/.openclaw
-└── lobster-3/
-    └── openclaw/     → 容器内 /home/node/.openclaw
+├── claw-1/
+│   └── openclaw/     → /home/node/.openclaw inside container
+├── claw-2/
+│   └── openclaw/     → /home/node/.openclaw inside container
+└── claw-3/
+    └── openclaw/     → /home/node/.openclaw inside container
 ```
 
-- 容器销毁后数据默认保留在宿主机上
-- `clawsandbox destroy --purge` 可同时删除数据
-- 目录权限设为 uid 1000（node 用户），与容器内用户一致
+- Data is preserved by default when a container is destroyed
+- `clawsandbox destroy --purge` removes the data directory as well
+- Directories are owned by uid 1000 (`node` user), matching the container's user
 
-### 3.6 网络设计
+### 3.6 Network Design
 
-**Docker 网络：**
-- 创建专用 bridge 网络 `clawsandbox-net`
-- 各容器通过容器名互相可达（为后续龙虾间通信预留）
-- 每个容器仅暴露 noVNC 和 Gateway 端口到宿主机
+**Docker network:**
+- A dedicated bridge network `clawsandbox-net` is created on first use
+- Containers can reach each other by name (reserved for future inter-claw communication)
+- Only the noVNC and Gateway ports are bound to the host
 
 ```
 clawsandbox-net (bridge)
-├── lobster-1 (172.20.0.2)
-├── lobster-2 (172.20.0.3)
-└── lobster-3 (172.20.0.4)
+├── claw-1 (172.20.0.2)
+├── claw-2 (172.20.0.3)
+└── claw-3 (172.20.0.4)
 ```
 
-**宿主机访问：**
-- noVNC: `http://localhost:6901` → lobster-1 桌面
-- Gateway: `ws://localhost:18789` → lobster-1 Gateway（内部用，用户一般不直接访问）
+**Host access:**
+- noVNC: `http://localhost:6901` → claw-1 desktop
+- Gateway: accessible at `http://127.0.0.1:18789` from inside the container's Chromium (loopback — not directly exposed to the host user)
 
-## 4. 用户操作流程
+## 4. User Workflows
 
-### 4.1 首次使用
-
-```
-# 1. 安装 ClawSandbox（下载单个二进制文件）
-curl -fsSL https://get.clawsandbox.dev | sh
-
-# 2. 创建 3 个龙虾
-clawsandbox create 3
-# → 拉取镜像（首次，约 1.4GB）
-# → 创建 Docker 网络
-# → 启动 3 个容器
-# → 输出:
-#   lobster-1  ✓  desktop: http://localhost:6901
-#   lobster-2  ✓  desktop: http://localhost:6902
-#   lobster-3  ✓  desktop: http://localhost:6903
-
-# 3. 打开龙虾桌面，进入 OpenClaw onboard 配置 Telegram 等
-clawsandbox desktop lobster-1
-# → 自动在浏览器中打开 http://localhost:6901
-```
-
-### 4.2 日常使用
-
-```
-# 查看军团状态
-clawsandbox list
-# NAME        STATUS    DESKTOP              UPTIME
-# lobster-1   running   http://localhost:6901 2d 3h
-# lobster-2   running   http://localhost:6902 2d 3h
-# lobster-3   stopped   -                    -
-
-# 启动/停止
-clawsandbox start lobster-3
-clawsandbox stop lobster-1
-
-# 查看日志
-clawsandbox logs lobster-1
-```
-
-### 4.3 OpenClaw Onboard 流程（容器内）
-
-用户通过 noVNC 进入桌面后，在终端中执行：
+### 4.1 First-time setup
 
 ```bash
-openclaw onboard --install-daemon
-openclaw gateway --port 18789 --verbose
+# 1. Build the Docker image (once, ~1.4 GB)
+clawsandbox build
+
+# 2. Create 3 claws
+clawsandbox create 3
+# Output:
+#   Creating claw-1 ... ✓  desktop: http://localhost:6901
+#   Creating claw-2 ... ✓  desktop: http://localhost:6902
+#   Creating claw-3 ... ✓  desktop: http://localhost:6903
+
+# 3. Open a claw's desktop and complete one-time onboarding
+clawsandbox desktop claw-1
 ```
 
-onboard 向导引导用户完成：
-1. 选择 LLM Provider（OpenAI/Anthropic 等）并输入 API Key
-2. 配置 Telegram Bot（输入从 @BotFather 获取的 bot token）
-3. 选择默认模型
-4. 启动 Gateway
+### 4.2 Daily use
 
-**后续优化方向（非第一版）：** 将 onboard 流程通过 ClawSandbox CLI 自动化，用户只需提供 API key 和 Telegram bot token，无需手动进入桌面操作。
+```bash
+clawsandbox list
+# NAME        STATUS    DESKTOP              UPTIME
+# claw-1   running   http://localhost:6901 2d 3h
+# claw-2   running   http://localhost:6902 2d 3h
+# claw-3   stopped   -                    -
 
-## 5. 资源预算
+clawsandbox start claw-3
+clawsandbox stop claw-1
+clawsandbox logs claw-1
+```
 
-基于 M4 MacBook Air (16GB RAM, 512GB SSD) 的测试环境：
+### 4.3 OpenClaw onboarding (inside the container)
 
-| 资源 | 单个实例 | 3 个实例 | 5 个实例 |
-|------|---------|---------|---------|
-| 内存（idle） | ~1.5GB | ~4.5GB | ~7.5GB |
-| 内存（Chromium 活跃） | ~3GB | ~9GB | 不建议 |
-| 磁盘（镜像） | 1.4GB（共享） | 1.4GB | 1.4GB |
-| 磁盘（数据卷/实例） | ~200MB | ~600MB | ~1GB |
-| CPU（idle） | <0.5 核 | <1.5 核 | <2.5 核 |
+After opening the noVNC desktop, open the terminal and run:
 
-**建议：**
-- 16GB 宿主机：最多同时运行 3 个活跃实例（含 Chromium），或 5 个轻载实例
-- 默认每容器 memory_limit=4GB，防止单实例内存泄漏影响宿主
-- 用户可通过配置调整资源限制
+```bash
+# Step 1: Run the setup wizard (configure LLM API key, Telegram bot, etc.)
+openclaw onboard --flow quickstart
 
-## 6. 项目目录结构
+# Step 2: Start the Gateway
+openclaw gateway --port 18789
+```
+
+Once the Gateway is running, open Chromium on the desktop and navigate to the URL printed in the terminal (e.g. `http://127.0.0.1:18789/#token=...`) to access the OpenClaw Control UI.
+
+**Future automation (not in v1):** ClawSandbox CLI will automate onboarding — users will only need to supply an API key and Telegram bot token, with no manual desktop interaction required.
+
+## 5. Resource Budget
+
+Tested on M4 MacBook Air (16 GB RAM, 512 GB SSD):
+
+| Resource | Per instance | 3 instances | 5 instances |
+|----------|-------------|-------------|-------------|
+| RAM (idle) | ~1.5 GB | ~4.5 GB | ~7.5 GB |
+| RAM (Chromium active) | ~3 GB | ~9 GB | not recommended |
+| Disk (image, shared) | 1.4 GB | 1.4 GB | 1.4 GB |
+| Disk (data volume) | ~200 MB | ~600 MB | ~1 GB |
+| CPU (idle) | <0.5 core | <1.5 cores | <2.5 cores |
+
+**Recommendations:**
+- 16 GB host: up to 3 active instances (with Chromium), or 5 light-load instances
+- Default `memory_limit=4g` per container prevents a single runaway instance from affecting the host
+- Adjust limits via `~/.clawsandbox/config.yaml`
+
+## 6. Repository Structure
 
 ```
 ClawSandbox/
-├── cmd/                        # CLI 入口
+├── cmd/
 │   └── clawsandbox/
 │       └── main.go
 ├── internal/
-│   ├── cli/                    # cobra 命令定义
+│   ├── cli/
 │   │   ├── root.go
+│   │   ├── build.go
 │   │   ├── create.go
 │   │   ├── list.go
 │   │   ├── start.go
@@ -329,138 +319,141 @@ ClawSandbox/
 │   │   ├── destroy.go
 │   │   ├── desktop.go
 │   │   ├── logs.go
-│   │   └── status.go
-│   ├── container/              # Docker 容器生命周期管理
-│   │   ├── manager.go          # 创建/启动/停止/删除容器
-│   │   ├── image.go            # 镜像构建/拉取
-│   │   └── network.go          # Docker 网络管理
-│   ├── port/                   # 端口分配
+│   │   └── helpers.go
+│   ├── container/
+│   │   ├── client.go
+│   │   ├── manager.go
+│   │   ├── image.go
+│   │   └── network.go
+│   ├── port/
 │   │   └── allocator.go
-│   ├── state/                  # 实例状态管理
+│   ├── state/
 │   │   └── store.go
-│   └── config/                 # 配置文件解析
-│       └── config.go
-├── docker/                     # Docker 镜像相关文件
-│   ├── Dockerfile
-│   ├── supervisord.conf
-│   └── entrypoint.sh
+│   ├── config/
+│   │   └── config.go
+│   └── assets/
+│       ├── embed.go
+│       └── docker/
+│           ├── Dockerfile
+│           ├── supervisord.conf
+│           └── entrypoint.sh
+├── docs/
+│   ├── SYSTEM_DESIGN.md         # English (primary)
+│   └── SYSTEM_DESIGN.zh-CN.md   # Chinese
 ├── go.mod
 ├── go.sum
 ├── Makefile
 ├── README.md
-├── PLAN.md
+├── README.zh-CN.md
 └── CLAUDE.md
 ```
 
-## 7. 技术依赖总览
+## 7. Dependencies
 
-### 宿主机（ClawSandbox CLI）
-| 依赖 | 用途 |
-|------|------|
-| Go 1.22+ | 编译 CLI |
-| Docker Engine | 容器运行时（Docker Desktop for Mac 或 colima） |
+### Host (ClawSandbox CLI)
+| Dependency | Purpose |
+|------------|---------|
+| Go 1.25+ | Compile the CLI |
+| Docker Engine | Container runtime (Docker Desktop for Mac or colima) |
 
-### 容器内
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| Debian Bookworm | 12 | 基础 OS |
-| Node.js | ≥22 | OpenClaw 运行时 |
-| OpenClaw | latest | AI 助手核心 |
-| Chromium (Playwright) | — | 浏览器自动化 |
-| XFCE4 | 4.18 | 轻量桌面环境 |
-| TigerVNC | — | VNC 服务端 |
-| noVNC + websockify | — | Web VNC 客户端 |
-| supervisord | — | 容器内多进程管理 |
+### Inside each container
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| Debian Bookworm | 12 | Base OS |
+| Node.js | 22 | OpenClaw runtime |
+| OpenClaw | latest | AI assistant core |
+| Chromium (Playwright) | — | Browser automation |
+| XFCE4 | 4.18 | Lightweight desktop |
+| TigerVNC | — | VNC server |
+| noVNC + websockify | — | Browser-accessible VNC client |
+| supervisord | — | Multi-process management inside container |
 
-### Go 模块依赖
-| 模块 | 用途 |
-|------|------|
-| `github.com/spf13/cobra` | CLI 框架 |
-| `github.com/docker/docker/client` | Docker Engine API |
-| `github.com/docker/go-connections` | Docker 辅助工具 |
-| `gopkg.in/yaml.v3` | 配置文件解析 |
+### Go modules
+| Module | Purpose |
+|--------|---------|
+| `github.com/spf13/cobra` | CLI framework |
+| `github.com/fsouza/go-dockerclient` | Docker Engine API |
+| `gopkg.in/yaml.v3` | Config file parsing |
 
-## 8. 交互界面演进策略
+## 8. UI Evolution Strategy
 
-项目采用分阶段交付策略，先跑通核心再打磨体验：
+The project uses a phased delivery approach — validate the core before polishing the experience.
 
-### 阶段一：CLI（开发调试期）
-所有操作通过命令行完成，快速验证核心功能闭环。这一阶段的产出是一个功能完整、可流畅使用的 CLI 工具。
+### Phase 1: CLI (current)
+All operations via the command line. Goal: a fully functional, production-usable CLI tool.
 
-### 阶段二：Web 配置页面（开源发布前）
-在 CLI 跑通后，为非技术用户实现 Web UI：
+### Phase 2: Web UI (before public release)
+After the CLI is stable, add a Web UI for non-technical users:
 
-- **军团管理面板**：ClawSandbox 在宿主机启动一个 Web 服务，提供统一的军团总览页面（创建/启停/销毁实例、查看状态）
-- **实例管理后台**：每个龙虾实例有独立的配置页面（LLM Provider、Telegram Bot、模型选择等），用户无需进入桌面终端即可完成 OpenClaw 配置
-- **桌面入口**：页面内嵌或链接到各实例的 noVNC 桌面
+- **Fleet management panel**: a web server on the host provides a unified overview page (create/start/stop/destroy instances, view status)
+- **Instance configuration**: each claw gets its own settings page (LLM provider, Telegram bot, model selection) — no desktop terminal needed for onboarding
+- **Desktop access**: embedded or linked noVNC view per instance
 
-CLI 始终保留作为高级用户和自动化场景的入口。
+The CLI is always kept as the primary interface for advanced users and automation.
 
-## 9. 实现范围
+## 9. Scope
 
-### 阶段一 MVP（CLI）
+### Phase 1 MVP (CLI)
 
-**包含：**
-- [x] Docker 镜像构建（Dockerfile + supervisord + entrypoint）
-- [x] `create N` — 创建 N 个容器实例
-- [x] `list` — 列出所有实例及状态
-- [x] `start/stop` — 启停实例
-- [x] `destroy` — 销毁实例
-- [x] `desktop` — 浏览器打开 noVNC
-- [x] 端口自动分配和冲突检测
-- [x] 实例数据卷持久化
+- [x] Docker image build (Dockerfile + supervisord + entrypoint)
+- [x] `build` — build the Docker image
+- [x] `create N` — create N container instances
+- [x] `list` — list all instances with live status from Docker
+- [x] `start` / `stop` — start and stop instances
+- [x] `destroy [--purge]` — destroy instances, optionally purging data
+- [x] `desktop` — open noVNC desktop in browser
+- [x] `logs [-f]` — tail instance logs
+- [x] Automatic port allocation with conflict detection
+- [x] Per-instance data volume persistence
 
-### 阶段二（Web UI）
-- [ ] 军团管理面板（Web 服务）
-- [ ] 实例配置页面（LLM/Telegram 等）
-- [ ] OpenClaw onboard 自动化
+### Phase 2 (Web UI)
+- [ ] Fleet management panel (web server)
+- [ ] Per-instance configuration pages (LLM / Telegram / etc.)
+- [ ] Automated OpenClaw onboarding
 
-**不包含（更远期）：**
-- 龙虾间群聊和任务分派
-- 实例模板/预设配置
-- 远程宿主机支持
+**Out of scope (future):**
+- Inter-claw group chat and task delegation
+- Instance templates / preset configurations
+- Remote host support
 
-## 10. 验证方案
+## 10. Validation
 
-### 构建验证
+### Build validation
 ```bash
-# 编译 CLI
 make build
-
-# 构建 Docker 镜像
-docker build -t clawsandbox/openclaw:latest -f docker/Dockerfile .
+clawsandbox build
 ```
 
-### 端到端验证
+### End-to-end validation
 ```bash
-# 1. 创建 2 个实例
+# 1. Create 2 instances
 clawsandbox create 2
 
-# 2. 确认容器运行中
+# 2. Confirm containers are running
 clawsandbox list
-docker ps | grep lobster
 
-# 3. 访问桌面
-clawsandbox desktop lobster-1
-# → 浏览器打开 http://localhost:6901，看到 XFCE 桌面
+# 3. Open desktop
+clawsandbox desktop claw-1
+# → Browser opens http://localhost:6901 showing XFCE desktop
 
-# 4. 在桌面终端中验证 OpenClaw
-#    打开终端 → 执行 openclaw --version → 确认可用
+# 4. Complete onboarding inside the container
+openclaw onboard --flow quickstart
+openclaw gateway --port 18789
+# → Open Chromium, navigate to printed URL, confirm Control UI loads
 
-# 5. 停止/启动
-clawsandbox stop lobster-1
-clawsandbox start lobster-1
-# → 确认数据（~/.openclaw）在容器重启后保留
+# 5. Stop / start (verify data persistence)
+clawsandbox stop claw-1
+clawsandbox start claw-1
+# → ~/.openclaw data survives container restart
 
-# 6. 销毁
-clawsandbox destroy lobster-2
+# 6. Destroy
+clawsandbox destroy claw-2
 clawsandbox list
-# → 确认 lobster-2 已移除
+# → claw-2 no longer listed
 ```
 
-### 资源验证
+### Resource validation
 ```bash
-# 监控容器资源使用
-docker stats lobster-1 lobster-2
-# → 确认内存在 memory_limit 之内
+docker stats claw-1 claw-2
+# → Confirm memory stays within memory_limit
 ```

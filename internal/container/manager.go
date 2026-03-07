@@ -5,6 +5,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 
@@ -70,18 +71,19 @@ func Remove(cli *docker.Client, containerID string) error {
 	})
 }
 
-func Status(cli *docker.Client, containerID string) (string, error) {
+// Status returns the container's status string and its StartedAt time (zero if not running).
+func Status(cli *docker.Client, containerID string) (string, time.Time, error) {
 	c, err := cli.InspectContainerWithOptions(docker.InspectContainerOptions{ID: containerID})
 	if err != nil {
-		return "unknown", nil
+		return "unknown", time.Time{}, nil
 	}
 	switch c.State.Status {
 	case "running":
-		return "running", nil
+		return "running", c.State.StartedAt, nil
 	case "exited", "dead":
-		return "stopped", nil
+		return "stopped", time.Time{}, nil
 	default:
-		return c.State.Status, nil
+		return c.State.Status, time.Time{}, nil
 	}
 }
 

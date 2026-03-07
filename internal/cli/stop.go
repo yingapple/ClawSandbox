@@ -11,7 +11,7 @@ import (
 
 var stopCmd = &cobra.Command{
 	Use:   "stop <name|all>",
-	Short: "Stop a running lobster instance",
+	Short: "Stop a running claw instance",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runStop,
 }

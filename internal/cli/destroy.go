@@ -18,7 +18,7 @@ var destroyPurge bool
 
 var destroyCmd = &cobra.Command{
 	Use:   "destroy <name|all>",
-	Short: "Destroy a lobster instance (data is kept by default)",
+	Short: "Destroy a claw instance (data is kept by default)",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runDestroy,
 }

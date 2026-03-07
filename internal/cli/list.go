@@ -14,7 +14,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls", "status"},
-	Short:   "List all lobster instances and their status",
+	Short:   "List all claw instances and their status",
 	RunE:    runList,
 }
 
@@ -39,15 +39,17 @@ func runList(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "────\t──────\t───────\t──────")
 
 	for _, inst := range store.Instances {
-		status, _ := container.Status(cli, inst.ContainerID)
+		status, startedAt, _ := container.Status(cli, inst.ContainerID)
 		inst.Status = status
 
 		desktop := fmt.Sprintf("http://localhost:%d", inst.Ports.NoVNC)
-		uptime := formatUptime(inst.CreatedAt)
+		uptime := "—"
+		if status == "running" && !startedAt.IsZero() {
+			uptime = formatUptime(startedAt)
+		}
 
 		if status != "running" {
 			desktop = "—"
-			uptime = "—"
 		}
 
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", inst.Name, status, desktop, uptime)

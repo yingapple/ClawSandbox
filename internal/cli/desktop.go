@@ -12,7 +12,7 @@ import (
 
 var desktopCmd = &cobra.Command{
 	Use:   "desktop <name>",
-	Short: "Open a lobster's noVNC desktop in the browser",
+	Short: "Open a claw's noVNC desktop in the browser",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runDesktop,
 }

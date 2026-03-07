@@ -14,7 +14,7 @@ var logsFollow bool
 
 var logsCmd = &cobra.Command{
 	Use:   "logs <name>",
-	Short: "View container logs for a lobster instance",
+	Short: "View container logs for a claw instance",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runLogs,
 }

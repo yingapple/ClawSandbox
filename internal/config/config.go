@@ -15,7 +15,7 @@ const (
 	DefaultGatewayBase  = 18789
 	DefaultMemoryLimit  = "4g"
 	DefaultCPULimit     = 2.0
-	DefaultNamingPrefix = "lobster"
+	DefaultNamingPrefix = "claw"
 
 	NetworkName  = "clawsandbox-net"
 	LabelManaged = "clawsandbox.managed"

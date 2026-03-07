@@ -36,6 +36,6 @@ Go CLI tool (cobra) that manages Docker containers. Key packages:
 - `internal/config/` — config file loader (`~/.clawsandbox/config.yaml`)
 - `internal/assets/` — embedded Docker build context (Dockerfile, supervisord.conf, entrypoint.sh)
 
-Each lobster instance is a Docker container running: XFCE4 desktop + TigerVNC + noVNC (browser access on port 690N) + OpenClaw Gateway (port 1878N).
+Each claw instance is a Docker container running: XFCE4 desktop + TigerVNC + noVNC (browser access on port 690N) + OpenClaw Gateway (port 1878N).
 
 Container data is persisted at `~/.clawsandbox/data/<name>/openclaw/` → `/home/node/.openclaw` inside the container.

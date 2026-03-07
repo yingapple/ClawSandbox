@@ -71,8 +71,12 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	created := 0
+	firstName := ""
 	for i := 0; i < n; i++ {
 		name := store.NextName(cfg.Naming.Prefix)
+		if firstName == "" {
+			firstName = name
+		}
 		usedPorts := store.UsedPorts()
 
 		novncPort, err := port.FindAvailable(cfg.Ports.NoVNCBase, usedPorts)
@@ -128,7 +132,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		created++
 	}
 
-	fmt.Printf("\n%d lobster(s) ready. Run 'clawsandbox desktop %s-1' to open the desktop.\n",
-		created, cfg.Naming.Prefix)
+	fmt.Printf("\n%d claw(s) ready. Run 'clawsandbox desktop %s' to open the desktop.\n",
+		created, firstName)
 	return nil
 }
