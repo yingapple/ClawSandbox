@@ -46,6 +46,24 @@ func Build(cli *docker.Client, imageRef string, out io.Writer) error {
 	return nil
 }
 
+// TagImage adds an additional tag to an already-built image.
+func TagImage(cli *docker.Client, existingRef, repo, tag string) error {
+	return cli.TagImage(existingRef, docker.TagImageOptions{
+		Repo:  repo,
+		Tag:   tag,
+		Force: true,
+	})
+}
+
+// PullImage pulls an image from a remote registry.
+func PullImage(cli *docker.Client, repo, tag string, out io.Writer) error {
+	return cli.PullImage(docker.PullImageOptions{
+		Repository:   repo,
+		Tag:          tag,
+		OutputStream: out,
+	}, docker.AuthConfiguration{})
+}
+
 func createBuildContext() (io.Reader, error) {
 	buf := &bytes.Buffer{}
 	tw := tar.NewWriter(buf)

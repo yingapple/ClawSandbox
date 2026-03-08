@@ -469,3 +469,69 @@ clawsandbox list
 docker stats lobster-1 lobster-2
 # → 确认内存在 memory_limit 之内
 ```
+
+## 11. 版本管理
+
+一次 `git tag` 同时锁定 CLI 和 Docker 镜像的版本，自动发布到 GitHub Release 和 GHCR。
+
+### 架构
+
+```
+git tag v0.1.0 && git push origin v0.1.0
+        │
+        ▼
+   GitHub Actions
+   ┌──────────────────┬──────────────────────┐
+   │  GoReleaser       │  Docker Build+Push    │
+   │  CLI 二进制 x4    │  ghcr.io 镜像         │
+   │  (darwin/linux    │  :0.1.0 + :latest     │
+   │   x amd64/arm64) │                        │
+   └────────┬─────────┴──────────┬─────────────┘
+            ▼                    ▼
+     GitHub Release         ghcr.io/weiyong1024/clawsandbox
+```
+
+### 共享版本包 (`internal/version/`)
+
+版本元数据（`Version`、`GitCommit`、`BuildDate`）在构建时通过 ldflags 注入到 `internal/version`。`internal/cli/version.go` 和 `internal/config/config.go` 均从此包导入。
+
+`ImageTag()` 函数根据 CLI 版本推导 Docker 镜像标签：
+- release 版本（如 `v0.1.0`）：返回 `0.1.0`
+- dev 版本（无标签）：返回 `latest`
+
+### 镜像命名与标签
+
+- **仓库地址**：`ghcr.io/weiyong1024/clawsandbox`
+- **默认标签**：运行时通过 `version.ImageTag()` 动态确定
+- `clawsandbox build` 同时打 `:<version>` 和 `:latest` 两个标签
+- `clawsandbox create` 使用 `:<version>` 确保 CLI 与镜像版本一致
+
+### 自动拉取镜像
+
+当 `clawsandbox create`（或仪表盘的创建接口）发现本地没有镜像时，自动尝试从 GHCR 拉取。联网用户无需执行 `clawsandbox build`。
+
+```
+本地未找到镜像
+  → docker pull ghcr.io/weiyong1024/clawsandbox:0.1.0
+  → 成功？继续创建
+  → 失败？提示用户执行 clawsandbox build
+```
+
+### CI 流水线 (`.github/workflows/release.yml`)
+
+触发条件：`v*` 标签推送。两个并行任务：
+
+| 任务 | 工具 | 产出 |
+|------|------|------|
+| `release` | GoReleaser | 4 个平台的 CLI 二进制 → GitHub Release |
+| `docker` | docker/build-push-action | 镜像 → `ghcr.io/weiyong1024/clawsandbox:<version>` + `:latest` |
+
+### 发版流程（维护者操作）
+
+```bash
+git checkout main
+git pull origin main
+git tag v0.1.0
+git push origin v0.1.0
+# CI 自动完成剩余工作
+```

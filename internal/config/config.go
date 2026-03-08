@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/weiyong1024/clawsandbox/internal/version"
 )
 
 const (
-	DefaultImageName    = "clawsandbox/openclaw"
-	DefaultImageTag     = "latest"
+	DefaultImageName = "ghcr.io/weiyong1024/clawsandbox"
 	DefaultNoVNCBase    = 6901
 	DefaultGatewayBase  = 18789
 	DefaultMemoryLimit  = "4g"
@@ -53,7 +54,7 @@ func (c *Config) ImageRef() string {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Image: ImageConfig{Name: DefaultImageName, Tag: DefaultImageTag},
+		Image: ImageConfig{Name: DefaultImageName, Tag: version.ImageTag()},
 		Ports: PortsConfig{NoVNCBase: DefaultNoVNCBase, GatewayBase: DefaultGatewayBase},
 		Resources: ResourceConfig{
 			MemoryLimit: DefaultMemoryLimit,

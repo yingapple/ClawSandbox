@@ -51,15 +51,7 @@ make build
 sudo make install
 ```
 
-### 2. Build the Docker image
-
-Required once. Downloads ~1.4 GB and takes a few minutes.
-
-```bash
-clawsandbox build
-```
-
-### 3. Deploy your fleet
+### 2. Deploy your fleet
 
 **Option A: Web Dashboard (recommended)**
 
@@ -89,7 +81,7 @@ clawsandbox create 3
 clawsandbox list
 ```
 
-### 4. Set up each claw
+### 3. Set up each claw
 
 Each claw needs a one-time configuration via its desktop. Open it from the Dashboard (click **"Desktop"** on an instance card) or via CLI:
 
@@ -121,8 +113,7 @@ clawsandbox dashboard --help    # Show dashboard subcommands
 Quick reference:
 
 ```bash
-clawsandbox build                       # Build the OpenClaw sandbox image
-clawsandbox create <N>                  # Create N claw instances
+clawsandbox create <N>                  # Create N claw instances (auto-pulls image)
 clawsandbox list                        # List all instances and their status
 clawsandbox desktop <name>              # Open an instance's desktop in the browser
 clawsandbox start <name|all>            # Start a stopped instance
@@ -132,9 +123,12 @@ clawsandbox logs <name> [-f]            # View instance logs
 clawsandbox destroy <name|all>          # Destroy instance (data kept by default)
 clawsandbox destroy --purge <name|all>  # Destroy instance and delete its data
 clawsandbox dashboard serve              # Start the Web Dashboard
+clawsandbox dashboard stop               # Stop the Web Dashboard
+clawsandbox dashboard restart            # Restart the Web Dashboard
 clawsandbox dashboard open               # Open the Dashboard in your browser
-clawsandbox config                      # Show current configuration
-clawsandbox version                     # Print version info
+clawsandbox build                        # Build image locally (offline/custom use)
+clawsandbox config                       # Show current configuration
+clawsandbox version                      # Print version info
 ```
 
 ## Resource Usage
