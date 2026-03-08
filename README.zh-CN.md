@@ -51,15 +51,7 @@ make build
 sudo make install
 ```
 
-### 2. 构建 Docker 镜像
-
-首次使用需要执行一次，下载约 1.4 GB，需要几分钟：
-
-```bash
-clawsandbox build
-```
-
-### 3. 部署龙虾军团
+### 2. 部署龙虾军团
 
 **方式 A：Web 仪表盘（推荐）**
 
@@ -89,7 +81,7 @@ clawsandbox create 3
 clawsandbox list
 ```
 
-### 4. 配置每只龙虾
+### 3. 配置每只龙虾
 
 每只龙虾需要通过其桌面完成一次初始化。可以在仪表盘点击 **「桌面」** 打开，也可以用 CLI：
 
@@ -121,8 +113,7 @@ clawsandbox dashboard --help    # 查看 dashboard 子命令组
 常用命令速查：
 
 ```bash
-clawsandbox build                       # 构建 OpenClaw 龙虾沙箱镜像
-clawsandbox create <N>                  # 创建 N 个龙虾实例
+clawsandbox create <N>                  # 创建 N 个龙虾实例（自动拉取镜像）
 clawsandbox list                        # 列出所有实例及状态
 clawsandbox desktop <name>              # 在浏览器中打开实例桌面
 clawsandbox start <name|all>            # 启动已停止的实例
@@ -132,9 +123,12 @@ clawsandbox logs <name> [-f]            # 查看实例日志
 clawsandbox destroy <name|all>          # 销毁实例（默认保留数据）
 clawsandbox destroy --purge <name|all>  # 销毁实例并删除数据
 clawsandbox dashboard serve              # 启动 Web 仪表盘
+clawsandbox dashboard stop               # 停止 Web 仪表盘
+clawsandbox dashboard restart            # 重启 Web 仪表盘
 clawsandbox dashboard open               # 在浏览器中打开仪表盘
-clawsandbox config                      # 显示当前配置
-clawsandbox version                     # 查看版本信息
+clawsandbox build                        # 本地构建镜像（离线或自定义场景）
+clawsandbox config                       # 显示当前配置
+clawsandbox version                      # 查看版本信息
 ```
 
 ## 资源占用参考

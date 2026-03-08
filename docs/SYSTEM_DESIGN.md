@@ -457,3 +457,69 @@ clawsandbox list
 docker stats claw-1 claw-2
 # → Confirm memory stays within memory_limit
 ```
+
+## 11. Version Management
+
+A single `git tag` locks both the CLI binary and Docker image to the same version, with automated publishing to GitHub Release and GHCR.
+
+### Architecture
+
+```
+git tag v0.1.0 && git push origin v0.1.0
+        │
+        ▼
+   GitHub Actions
+   ┌──────────────────┬──────────────────────┐
+   │  GoReleaser       │  Docker Build+Push    │
+   │  CLI binaries x4  │  ghcr.io image        │
+   │  (darwin/linux    │  :0.1.0 + :latest     │
+   │   x amd64/arm64) │                        │
+   └────────┬─────────┴──────────┬─────────────┘
+            ▼                    ▼
+     GitHub Release         ghcr.io/weiyong1024/clawsandbox
+```
+
+### Shared version package (`internal/version/`)
+
+Version metadata (`Version`, `GitCommit`, `BuildDate`) is injected at build time via ldflags into `internal/version`. Both `internal/cli/version.go` and `internal/config/config.go` import from this shared package.
+
+The `ImageTag()` helper derives the Docker image tag from the CLI version:
+- Release build (e.g. `v0.1.0`): returns `0.1.0`
+- Dev build (no tag): returns `latest`
+
+### Image naming and tagging
+
+- **Registry**: `ghcr.io/weiyong1024/clawsandbox`
+- **Default tag**: determined at runtime via `version.ImageTag()`
+- `clawsandbox build` tags the image with both `:<version>` and `:latest`
+- `clawsandbox create` uses `:<version>` to ensure CLI-image version consistency
+
+### Auto-pull on create
+
+When `clawsandbox create` (or the Dashboard's create action) finds the image missing locally, it automatically attempts `docker pull` from GHCR before failing. Users with internet access never need to run `clawsandbox build`.
+
+```
+image not found locally
+  → docker pull ghcr.io/weiyong1024/clawsandbox:0.1.0
+  → success? proceed with create
+  → fail? suggest `clawsandbox build`
+```
+
+### CI pipeline (`.github/workflows/release.yml`)
+
+Triggered on `v*` tag push. Two parallel jobs:
+
+| Job | Tool | Output |
+|-----|------|--------|
+| `release` | GoReleaser | 4 CLI binaries → GitHub Release |
+| `docker` | docker/build-push-action | Image → `ghcr.io/weiyong1024/clawsandbox:<version>` + `:latest` |
+
+### Release workflow (for maintainers)
+
+```bash
+git checkout main
+git pull origin main
+git tag v0.1.0
+git push origin v0.1.0
+# CI handles the rest
+```

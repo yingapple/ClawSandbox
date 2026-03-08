@@ -8,9 +8,9 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 LDFLAGS    = -s -w \
-  -X '$(MODULE)/internal/cli.Version=$(VERSION)' \
-  -X '$(MODULE)/internal/cli.GitCommit=$(GIT_COMMIT)' \
-  -X '$(MODULE)/internal/cli.BuildDate=$(BUILD_DATE)'
+  -X '$(MODULE)/internal/version.Version=$(VERSION)' \
+  -X '$(MODULE)/internal/version.GitCommit=$(GIT_COMMIT)' \
+  -X '$(MODULE)/internal/version.BuildDate=$(BUILD_DATE)'
 
 .PHONY: build build-all docker-build install clean tidy
 

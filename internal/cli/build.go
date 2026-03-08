@@ -8,14 +8,16 @@ import (
 
 	"github.com/weiyong1024/clawsandbox/internal/config"
 	"github.com/weiyong1024/clawsandbox/internal/container"
+	"github.com/weiyong1024/clawsandbox/internal/version"
 )
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build the OpenClaw sandbox Docker image",
-	Long: `Build the clawsandbox/openclaw Docker image locally.
-This is required once before running 'clawsandbox create'.
-The build downloads ~1.4 GB and may take several minutes.`,
+	Long: `Build the OpenClaw sandbox Docker image locally.
+This is only needed for offline use or customization.
+When connected to the internet, 'clawsandbox create' auto-pulls the
+pre-built image from GHCR.`,
 	Example: "  clawsandbox build",
 	RunE:    runBuild,
 }
@@ -36,6 +38,16 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	if err := container.Build(cli, imageRef, os.Stdout); err != nil {
 		return fmt.Errorf("build failed: %w", err)
+	}
+
+	// Also tag as :latest when building a versioned image
+	if version.ImageTag() != "latest" {
+		latestRef := fmt.Sprintf("%s:latest", cfg.Image.Name)
+		if err := container.TagImage(cli, imageRef, cfg.Image.Name, "latest"); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to tag as %s: %v\n", latestRef, err)
+		} else {
+			fmt.Printf("Also tagged as %s\n", latestRef)
+		}
 	}
 
 	fmt.Printf("\nImage %s built successfully.\n", imageRef)

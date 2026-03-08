@@ -5,13 +5,8 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-)
 
-var (
-	// Injected at build time via ldflags. See Makefile / .goreleaser.yml.
-	Version   = "dev"
-	GitCommit = "unknown"
-	BuildDate = "unknown"
+	"github.com/weiyong1024/clawsandbox/internal/version"
 )
 
 var versionShort bool
@@ -21,12 +16,12 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version of ClawSandbox",
 	Run: func(cmd *cobra.Command, args []string) {
 		if versionShort {
-			fmt.Println(Version)
+			fmt.Println(version.Version)
 			return
 		}
-		fmt.Printf("clawsandbox %s\n", Version)
-		fmt.Printf("  commit:    %s\n", GitCommit)
-		fmt.Printf("  built:     %s\n", BuildDate)
+		fmt.Printf("clawsandbox %s\n", version.Version)
+		fmt.Printf("  commit:    %s\n", version.GitCommit)
+		fmt.Printf("  built:     %s\n", version.BuildDate)
 		fmt.Printf("  go:        %s\n", runtime.Version())
 		fmt.Printf("  platform:  %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	},
