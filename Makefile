@@ -2,6 +2,7 @@ BINARY     = clawsandbox
 BUILD_DIR  = ./bin
 MODULE     = github.com/weiyong1024/clawsandbox
 IMAGE      = clawsandbox/openclaw:latest
+GO_BOOTSTRAP = ./scripts/ensure-go.sh --print-path
 
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -14,14 +15,21 @@ LDFLAGS    = -s -w \
 
 .PHONY: build build-all docker-build install clean reset tidy test vet
 
+define run-go
+	@GO_BIN="$$( $(GO_BOOTSTRAP) )" && \
+	$(1)
+endef
+
 build:
-	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/clawsandbox
+	@mkdir -p $(BUILD_DIR)
+	$(call run-go,"$$GO_BIN" build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/clawsandbox)
 
 build-all:
-	CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-arm64  ./cmd/clawsandbox
-	CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-amd64  ./cmd/clawsandbox
-	CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64   ./cmd/clawsandbox
-	CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64   ./cmd/clawsandbox
+	@mkdir -p $(BUILD_DIR)
+	$(call run-go,env CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 "$$GO_BIN" build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-arm64 ./cmd/clawsandbox)
+	$(call run-go,env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 "$$GO_BIN" build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-amd64 ./cmd/clawsandbox)
+	$(call run-go,env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$$GO_BIN" build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64 ./cmd/clawsandbox)
+	$(call run-go,env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "$$GO_BIN" build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64 ./cmd/clawsandbox)
 
 docker-build:
 	docker build -t $(IMAGE) -f internal/assets/docker/Dockerfile internal/assets/docker/
@@ -30,13 +38,13 @@ install: build
 	cp $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
 
 test:
-	go test ./...
+	$(call run-go,"$$GO_BIN" test ./...)
 
 vet:
-	go vet ./...
+	$(call run-go,"$$GO_BIN" vet ./...)
 
 tidy:
-	go mod tidy
+	$(call run-go,"$$GO_BIN" mod tidy)
 
 clean:
 	rm -rf $(BUILD_DIR)

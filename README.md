@@ -47,6 +47,8 @@ OpenClaw is a self-hosted personal AI assistant that connects to 20+ messaging p
 git clone https://github.com/weiyong1024/ClawSandbox.git
 cd ClawSandbox
 make build
+# If Go is missing, ClawSandbox bootstraps the Go version from go.mod
+# into a user-local toolchain directory automatically.
 # Optionally install to PATH (otherwise use ./bin/clawsandbox in place of clawsandbox below):
 sudo make install
 ```
