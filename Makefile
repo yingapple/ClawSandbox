@@ -13,15 +13,12 @@ LDFLAGS    = -s -w \
   -X '$(MODULE)/internal/version.GitCommit=$(GIT_COMMIT)' \
   -X '$(MODULE)/internal/version.BuildDate=$(BUILD_DATE)'
 
-.PHONY: bootstrap-go build build-all docker-build install clean reset tidy test vet
+.PHONY: build build-all docker-build install clean reset tidy test vet
 
 define run-go
 	@GO_BIN="$$( $(GO_BOOTSTRAP) )" && \
 	$(1)
 endef
-
-bootstrap-go:
-	@$(GO_BOOTSTRAP) >/dev/null
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -38,7 +35,7 @@ docker-build:
 	docker build -t $(IMAGE) -f internal/assets/docker/Dockerfile internal/assets/docker/
 
 install: build
-	install -m 0755 $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
+	cp $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
 
 test:
 	$(call run-go,"$$GO_BIN" test ./...)
