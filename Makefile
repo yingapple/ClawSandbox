@@ -41,13 +41,13 @@ install: build
 	install -m 0755 $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
 
 test:
-	$(call run-go,test ./...)
+	$(call run-go,"$$GO_BIN" test ./...)
 
 vet:
-	$(call run-go,vet ./...)
+	$(call run-go,"$$GO_BIN" vet ./...)
 
 tidy:
-	$(call run-go,mod tidy)
+	$(call run-go,"$$GO_BIN" mod tidy)
 
 clean:
 	rm -rf $(BUILD_DIR)
